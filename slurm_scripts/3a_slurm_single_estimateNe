@@ -1,0 +1,50 @@
+#!/bin/bash
+#SBATCH -t 02:00:00
+#SBATCH -A
+#SBATCH -p
+#SBATCH --mem=3600
+#SBATCH -J s_estimation
+#SBATCH --mail-type=None
+#SBATCH -o estimation_n-%A.output
+#SBATCH -e estimation_n-%A.error
+#SBATCH -n 1 #number of tasks
+#SBATCH -c 1 #number of cores (use more for multithreading)
+
+
+# Load required modules
+module load lang/R/4.0.3-foss-2020b
+module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+module load vis/matplotlib/3.4.2-foss-2021a
+
+
+
+
+
+# Define parameter lists
+noise_paths=("0" "4" "8" "12")
+num_targets=("10" "25" "50")
+sampling_noise=("" "noise14")
+coverage=(1000 40) 
+Nsampling=(1000 100)  
+
+# Loop over parameters and execute srun jobs sequentially
+for noise_path in "${noise_paths[@]}"; do
+    for num_target in "${num_targets[@]}"; do
+        # Loop over coverage and Nsampling arrays using indices
+        for i in "${!coverage[@]}"; do
+            cov="${coverage[$i]}"
+            sampling="${Nsampling[$i]}"
+            sampling_str="${sampling_noise[$i]}"
+
+            # Define file paths based on parameters
+            sync_unz="/lustre/miifs01/project/m2_datamining/sync_data/${sampling_str}haplos_max_${noise_path}_r_t_${num_target}.unz.sync"
+            animal="max_${noise_path}_r_t_${num_target}_n_${sampling_str}"
+
+            srun Rscript estimate_Ne.R --filename "$sync_unz" --animal "$animal"
+        done
+    done
+done
+
+# write in fix variables
+
+srun python write_Nes.py

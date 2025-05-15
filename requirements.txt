@@ -1,0 +1,7 @@
+tensorflow~=2.18.0
+numpy~=1.26.4
+scipy~=1.14.1
+seaborn~=0.13.2
+matplotlib~=3.10.0
+munch~=4.0.0
+pandas~=2.2.3

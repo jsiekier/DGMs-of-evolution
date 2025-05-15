@@ -1,0 +1,31 @@
+#!/bin/bash
+#SBATCH -t 48:00:00
+#SBATCH -A
+#SBATCH -p
+#SBATCH --mem=32000
+#SBATCH -J train_vae
+#SBATCH --mail-type=None
+#SBATCH -o train_vae-%A.%a.output
+#SBATCH -e train_vae-%A.%a.error
+#SBATCH -n 1 #number of tasks
+#SBATCH -c 1 #number of cores (use more for multithreading)
+#SBATCH --array=0-2:1
+#SBATCH --gres=gpu:1
+
+
+# Load required modules
+module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+module load vis/matplotlib/3.4.2-foss-2021a
+
+# Assign arguments to variables
+animal="$1"
+nn_name="$2"
+integrate_gene="$3"
+
+# Ensure integrate_gene is an integer
+if ! [[ "$integrate_gene" =~ ^[0-9]+$ ]]; then
+    echo "Error: integrate_gene must be an integer, but got '$integrate_gene'" >&2
+    exit 1
+fi
+
+srun python pipeline.py --nn_name "$nn_name" --animal "$animal" --multiply_result 0 --sf_ex_alpha 0.0 --exclude_sf 0 --loss_type 'L2' --include_parallel_info 0 --integrate_gene $integrate_gene --learning_rate 0.0001 --nn 'AE' --prior 'gauss' --KLD 5 --fine_tune 0 --model_num $SLURM_ARRAY_TASK_ID --time_batch_size 6 --num_train_it 0 --num_replicates 0 --pretrain_sessions 0 --recursive_enc 0 --recursive_dec 0 --end_z_dim 10 --item_assignment 1 --non_linearity 'tanh' --batch_size 100 --num_layers 6 --batchnorm_axis 0 --linkage_prior 0 --num_neighbors 50 --enc_type 'sim'

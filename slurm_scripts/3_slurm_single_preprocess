@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH -t 01:00:00  # 6 hours
+#SBATCH -A
+#SBATCH -p
+#SBATCH --mem=36000  # 72GB memory
+#SBATCH -J preprocessing
+#SBATCH --mail-type=None
+#SBATCH -o preprocess-%A.output
+#SBATCH -e preprocess-%A.error
+#SBATCH -n 1  # Number of tasks
+#SBATCH -c 1  # Number of cores
+
+# Load required modules
+module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+module load vis/matplotlib/3.4.2-foss-2021a
+
+# Assign arguments to variables
+animal="$1"
+
+srun python preprocessing.py --animal "$animal"

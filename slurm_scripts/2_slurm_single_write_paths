@@ -1,0 +1,58 @@
+#!/bin/bash
+#SBATCH -t 04:00:00
+#SBATCH -A
+#SBATCH -p
+#SBATCH --mem=72000
+#SBATCH -J simulation
+#SBATCH --mail-type=None
+#SBATCH -o simulation-%A.output
+#SBATCH -e simulation-%A.error
+#SBATCH -n 1  # Number of tasks
+#SBATCH -c 2  # Number of cores
+
+# Load required modules
+module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+module load vis/matplotlib/3.4.2-foss-2021a
+
+# Define parameter lists
+noise_paths=("0" "4" "8" "12")
+num_targets=("10" "25" "50")
+sampling_noise=("" "noise14")
+coverage=(1000 40)  # Fixed the syntax issue, this should be 1000 40
+Nsampling=(1000 100)  # Fixed the syntax issue, this should be 1000 100
+
+# Loop over parameters and execute srun jobs sequentially
+for noise_path in "${noise_paths[@]}"; do
+    for num_target in "${num_targets[@]}"; do
+        # Loop over coverage and Nsampling arrays using indices
+        for i in "${!coverage[@]}"; do
+            cov="${coverage[$i]}"
+            sampling="${Nsampling[$i]}"
+            sampling_str="${sampling_noise[$i]}"
+
+            # Define file paths based on parameters
+            haplo_file="/gpfs/fs1/home/jsiekier/promotion/simulations/data/haplos_max_${noise_path}_r"
+            target_file="/gpfs/fs1/home/jsiekier/promotion/simulations/targets/targets_max${noise_path}_t_${num_target}.txt"
+            sync_zip="/lustre/miifs01/project/m2_datamining/sync_data/haplos_max_${noise_path}_r_t_${num_target}.sync"
+            sync_unz="/lustre/miifs01/project/m2_datamining/sync_data/${sampling_str}haplos_max_${noise_path}_r_t_${num_target}.unz.sync"
+            sync_process="/lustre/miifs01/project/m2_datamining/sync_data/${sampling_str}haplos_max_${noise_path}_r_t_${num_target}.pkl"
+            eval_positions="/lustre/miifs01/project/m2_datamining/sync_data/linkage_stuff/haplos_max_${noise_path}_r_t_${num_target}.txt"
+            estimated_s="/lustre/miifs01/project/m2_datamining/sync_data/s_estimation/${sampling_str}haplos_max_${noise_path}_r_t_${num_target}.txt"
+            LD_example="/lustre/miifs01/project/m2_datamining/sync_data/LD/haplos_max_${noise_path}_r_t_${num_target}.unz.sync"
+            cmh="/lustre/miifs01/project/m2_datamining/sync_data/${sampling_str}haplos_max_${noise_path}_r_t_${num_target}.cmh"
+            animal="max_${noise_path}_r_t_${num_target}_n_${sampling_str}"
+
+            # Execute the Python script using srun (sequential execution)
+            srun python write_fix_params.py --sync "$sync_unz" --sync_process "$sync_process" \
+                --start_haplos "$haplo_file" --targets "$target_file" \
+                --eval_positions "$eval_positions" --estimated_s "$estimated_s" \
+                --LD_example "$LD_example" --cmh "$cmh" \
+                --step_size 5 --num_generations 16 --num_replicates 10 \
+                --num_train_reps 10 --max_gene_len 8000 --num_train_generations 7 \
+                --Ne 1000 --Nes 500 --Ncensus 1000 --Nsampling "$sampling" --coverage "$cov" \
+                --animal "$animal" --work_from "mogon"
+        done
+    done
+done
+
+

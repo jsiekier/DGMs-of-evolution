@@ -1,0 +1,35 @@
+#!/bin/bash
+#SBATCH -t 06:00:00  # 6 hours
+#SBATCH -A
+#SBATCH -p
+#SBATCH --mem=72000  # 72GB memory
+#SBATCH -J simulation
+#SBATCH --mail-type=None
+#SBATCH -o simulation-%A.output
+#SBATCH -e simulation-%A.error
+#SBATCH -n 1  # Number of tasks
+#SBATCH -c 2  # Number of cores
+
+module load lang/Java/13.0.2
+
+# Assign arguments to variables
+haplo_file="$1"
+target_file="$2"
+sync_zip="$3"
+sync_unz="$4"
+
+# Run Java program
+srun java -jar mim2-v206.jar qt --haplotypes-g0 "$haplo_file" \
+    --recombination-rate dmel_2L.rr.txt  \
+    --effect-size "$target_file" \
+    --heritability 1 \
+    --snapshots 0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75 \
+    --replicate-runs 10 \
+    --output-sync "$sync_zip" \
+    --threads 16 \
+    --selection-regime selection_effect/selection_regime_01 \
+    --sex sex-info \
+    --population-size population_size_1000
+
+# Unzip sync file
+gzip -dc "$sync_zip" > "$sync_unz"

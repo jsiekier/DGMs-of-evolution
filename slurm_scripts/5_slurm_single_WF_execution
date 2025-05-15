@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH -t 24:00:00
+#SBATCH -A
+#SBATCH -p
+#SBATCH --mem=64000
+#SBATCH -J WF_estimation
+#SBATCH --mail-type=None
+#SBATCH -o WF_estimation-%A.%a.output
+#SBATCH -e WF_estimation-%A.%a.error
+#SBATCH -n 1 #number of tasks
+#SBATCH -c 1 #number of cores (use more for multithreading)
+#SBATCH --array=0-0:1
+
+
+# Load required modules
+module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+module load vis/matplotlib/3.4.2-foss-2021a
+
+# Assign arguments to variables
+animal="$1"
+
+
+srun python pipeline_eval_wf.py --animal "$animal"

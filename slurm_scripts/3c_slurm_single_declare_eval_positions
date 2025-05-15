@@ -1,0 +1,23 @@
+#!/bin/bash
+#SBATCH -t 10:00:00
+#SBATCH -A
+#SBATCH -p
+#SBATCH --mem=32000
+#SBATCH -J declare_eval #linkage
+#SBATCH --mail-type=None
+#SBATCH -o declare_eval-%A.%a.output
+#SBATCH -e declare_eval-%A.%a.error
+#SBATCH -n 1 #number of tasks
+#SBATCH -c 1 #number of cores (use more for multithreading)
+
+
+# Load required modules
+module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+module load vis/matplotlib/3.4.2-foss-2021a
+
+# Assign arguments to variables
+animal="$1"
+
+
+
+srun python build_eval_infos.py --animal_gt "$animal"
