@@ -81,7 +81,7 @@ class FocusSeqEnc(tf.keras.Model):
         #neighbor_enc2_numpy=neighbor_enc2.numpy()
         # Step 1: Compute similarity scores (dot product similarity)
         similarity_scores = tf.matmul(focus_enc2_normalized, neighbor_enc2_normalized, transpose_b=True)
-        similarity_scores=tf.abs(similarity_scores)
+        #similarity_scores=tf.abs(similarity_scores)
         #tmp1=similarity_scores.numpy()# Shape: (batch_size, 1, n)
 
         # Step 2: Normalize similarity scores to [0, 1] range using softmax
