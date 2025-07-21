@@ -2,6 +2,7 @@ from data_processing.create_pool_seq_file import convert_to_pool_seq_file
 from data_processing.sampling_noise import make_noise_file
 from variables import fix_variables
 import argparse
+from data_processing.Data_loader import read_sync_file_bi_allelic
 
 
 
@@ -47,6 +48,9 @@ if __name__ == '__main__':
     sync_file = fix_variables[work_from][animal]['sync']
     out_file = fix_variables[work_from][animal]['sync_process']
     haplo_file=fix_variables[work_from][animal]['start_haplos']
+    haplo_bases = get_haplo_bases(haplo_file)
+    read_sync_file_bi_allelic(sync_file, num_generations, num_replicates, num_train_generations, num_train_reps,
+                              out_file,haplo_bases, zip=False)
 
     animal_noise=animal+'noise14'#'noise25'#
     make_noise_file(animal, animal_noise, [100], [40], chrom=chrom)

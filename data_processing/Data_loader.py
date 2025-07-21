@@ -32,6 +32,105 @@ def get_fine_tuning_indices(allele_data, percentag):
     return result
 
 
+def read_sync_file_bi_allelic(sync_file, num_generations, num_replicates, num_train_generations,
+                              num_train_reps,out_file,haplo_bases=[],zip=True,transpose=False,filter_afc=0):
+
+    #sync_file = open(sync_file, 'r')
+    allele_data=dict()
+    distance_data=dict()
+    nucleotide_idx=dict()
+    #start_dist=0
+    #seqid='None'
+    if zip:
+        open_method,open_str=gzip.open,'rb'
+    else:
+        open_method, open_str = open, 'r'
+
+    with open_method(sync_file, open_str) as f:  # gzip.open(input_file_name, 'rb')
+        for line_num,line in enumerate(f):
+            if zip:
+                line = line.decode('utf-8')
+            snp_line=np.zeros((num_train_reps,num_train_generations,4))
+            splitted = line.replace("\n", "").split("\t")
+            seqid, position, base = splitted[:3]
+            print('base',base)
+            allele_pair = haplo_bases[line_num][0].split('/')
+            print(allele_pair)
+            alignment = splitted[3:]
+            all_sums=False
+            if seqid not in allele_data:
+                allele_data[seqid]=[]
+                distance_data[seqid]=[]
+                nucleotide_idx[seqid]=[]
+            #base_idx_1 = base_to_idx[base]
+            #some_idx = None
+            for pool_num, pool in enumerate(alignment):
+                rep_idx=pool_num//num_generations
+                gen_idx=pool_num%num_generations
+
+                if rep_idx<num_train_reps and gen_idx<num_train_generations:
+                    pool_split=pool.split(":")[:4]
+                    #sum_=0
+
+                    for n_idx,e in enumerate(pool_split):
+                        coverage=float(e)
+                        #sum_+=coverage
+                        snp_line[rep_idx,gen_idx,n_idx]=coverage
+
+            if np.sum(snp_line):
+                # search  1. and 2. highest freq:
+
+                #freqs=snp_line[:,0]/np.sum(snp_line[:,0],axis=-1,keepdims=True)
+                #replace nan with zeros:
+                #freqs=np.nan_to_num(freqs,nan=0)
+                #freqs=np.mean(freqs,axis=0)
+                #idx=list(sorted(enumerate(freqs),key=lambda x:x[1],reverse=True))
+                #first_idx,second_idx=idx[0][0],idx[1][0]
+                first_idx,second_idx=base_to_idx[allele_pair[0]],base_to_idx[allele_pair[1]]
+
+                snp_line=snp_line[:,:,[first_idx,second_idx]]
+                freqs = snp_line / np.sum(snp_line, axis=-1,keepdims=True)
+                freqs = np.nan_to_num(freqs, nan=0)[:,:,0]
+
+
+                allele_data[seqid].append(freqs)
+                distance_data[seqid].append(int(position))
+                nucleotide_idx[seqid].append([first_idx,second_idx])
+                start_dist=int(position)
+    all_filter_idx = dict()
+    for key in allele_data.keys():
+        allele_data[key]=np.asarray(allele_data[key])
+        distance_data[key] = np.asarray(distance_data[key])
+        nucleotide_idx[key] = np.asarray(nucleotide_idx[key])
+
+
+        if transpose:
+            old_shape=allele_data[key].shape
+            allele_data[key] = np.reshape(allele_data[key], newshape=(old_shape[0], old_shape[1] * old_shape[2]), order='C')
+            allele_data[key] = np.reshape(allele_data[key], newshape=(old_shape[0], old_shape[1] , old_shape[2]), order='F')
+        if filter_afc:
+            afcs = np.abs(allele_data[key][:, :, 0] - allele_data[key][:, :, 6])
+            afc_rep_max = np.max(afcs, axis=1)
+            filter_idx= np.argwhere(afc_rep_max > filter_afc)
+
+            allele_data[key]=allele_data[key][filter_idx]
+            distance_data[key] = distance_data[key][filter_idx]
+            nucleotide_idx[key]=nucleotide_idx[key][filter_idx]
+            all_filter_idx[key]=filter_idx
+
+
+
+    fine_tuning_indices=get_fine_tuning_indices(allele_data,percentag=0.1)
+
+    data={'alleles':allele_data,'distances':distance_data,
+          'fine_tuning_indices':fine_tuning_indices,'nucleotide_idx':nucleotide_idx}
+
+    data['filter_idx']=all_filter_idx
+    print(fine_tuning_indices)
+    pickle.dump(data,open(out_file,'wb'))
+
+
+    return allele_data,distance_data
 
 
 
