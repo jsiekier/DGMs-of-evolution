@@ -1,5 +1,6 @@
-from data_processing.file_reader import read_positions
-from t_linkage import read_haplo_file, calculate_all_linkages
+from data_processing.file_reader import read_positions,read_positions_chroms
+from t_linkage import read_haplo_file, calculate_all_linkages,read_haplo_file_chrom_no_nucleotides
+
 from variables import fix_variables
 import random
 import os
@@ -66,3 +67,61 @@ def calculate_LD_on_subset(animals,work_from,sample_size=1000,n_window=50,ld_idx
 
 
 
+
+def calculate_LD_on_subset_chrom(animal,work_from,sample_size=1000,n_window=50,ld_idx=1,chroms=['2L']):
+    # 1. get position names
+    #gt_animal1
+    haplo_file=fix_variables[work_from][animal]['start_haplos']
+    positions_chrom=read_positions_chroms(haplo_file)
+    # 3. calculate LD for all these combinations and save this in an LD directory
+
+
+    LD_file_path = fix_variables[work_from][animal]['LD_example']
+    if not os.path.isfile(LD_file_path):
+
+        haplo_data_chrom = read_haplo_file_chrom_no_nucleotides(haplo_file)
+        print('read haplo finished')
+
+        all_LDs = dict()
+        for c_idx, chrom in enumerate(chroms):
+            # 2. sample 2 sets of random position combinations
+            if chrom in positions_chrom:
+                positions=positions_chrom[chrom]
+                pos_idx = list(range(len(positions) - 1))
+
+                sample_direct_neighbor_idx = random.sample(pos_idx, sample_size)
+                sample_direct_neighbor = [(positions[idx], positions[idx + 1]) for idx in sample_direct_neighbor_idx]
+
+                pos_idx = pos_idx[:-n_window]
+                neighbor_add = list(range(2, n_window))
+                sample_indirect_neighbor_idx = random.sample(pos_idx, sample_size)
+                sample_indirect_neighbor = [(positions[idx], positions[idx + random.choice(neighbor_add)]) for idx in
+                                            sample_indirect_neighbor_idx]
+
+                all_LDs[chrom]=[]
+                for pair_set in [sample_direct_neighbor, sample_indirect_neighbor]:
+                    LDs = []
+                    for (n, neighbor) in pair_set:
+                        result = calculate_all_linkages(n, [neighbor], haplotype_dict=haplo_data_chrom[chrom])
+                        LDs.append((result[0][0], result[1][0], result[3][0]))
+
+                    all_LDs[chrom].append(LDs)
+
+        # save the LD file
+        pkl.dump(all_LDs, open(LD_file_path, 'wb'))
+    else:
+        LDs = pkl.load(open(LD_file_path, 'rb'))
+        all_LDs = LDs
+
+    all_LDs_def=dict()
+    for key,pos_type in all_LDs.items():
+        all_LDs_def[key]=[]
+        #print(pos_type)
+        for entry in pos_type:
+            all_LDs_def[key].append([])
+            #print(entry,flush=True)
+            for e in entry:
+                #print(e)
+                #defs =zip(*e)
+                all_LDs_def[key][-1].append(e[ld_idx])
+    return  all_LDs_def

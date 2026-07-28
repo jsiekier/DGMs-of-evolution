@@ -76,6 +76,41 @@ def read_estimated_s_positions(estimated_s_file,positions_arr):
             result[i].append(s_dict_chom[p])
     return result
 
+def read_positions_chroms(file_path):
+    file_stream=open(file_path,'r')
+    positions=dict()
+    for line in file_stream:
+        # filter positions with any nans 'n'
+        line =line.replace('\n','')
+        if 'N' not in line:
+            chrom,pos=line.split('\t')[:2]
+            if chrom not in positions:
+                positions[chrom]=[]
+            positions[chrom].append(int(pos))
+        else:
+            print('N',end='')
+    file_stream.close()
+    return positions
+
+
+
+def read_targets_acc_to_afc(sync_file,eval_file):
+    idx_list = pickle.load(open(eval_file, 'rb'))
+    data = pickle.load(open(sync_file, 'rb'))
+    targets = dict()
+    no_targets = dict()
+    targets_org_pos = dict()
+    no_targets_org_pos = dict()
+
+    for chrom ,positions in data['distances'].items():
+        #normal_pos=fine_tuning_indices[chrom]
+        targets[chrom]=np.asarray(idx_list['selected'][chrom]).tolist()
+        no_targets[chrom]=np.asarray( idx_list['unselected'][chrom]).tolist()
+        targets_org_pos[chrom]=np.squeeze(positions[targets[chrom]])
+        no_targets_org_pos[chrom]=np.squeeze(positions[no_targets[chrom]])
+
+    return targets, no_targets,targets_org_pos,no_targets_org_pos
+
 
 
 

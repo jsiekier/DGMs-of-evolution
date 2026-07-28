@@ -1,7 +1,8 @@
 from eval.find_evaluation_idx import get_eval_positions
-from eval.calculate_metric import calculate_metric
+from eval.calculate_metric import calculate_metric, calculate_metric_chrom
 from variables import fix_variables
-from linkage.t_linkage import calculate_linkage_metric
+from linkage.t_linkage import calculate_linkage_metric,calculate_linkages_all_reps
+
 import pickle as pkl
 import argparse
 
@@ -25,13 +26,32 @@ if __name__ == '__main__':
 
 
 
-    eval_idx_dict = get_eval_positions(selection_file, haplo_file, region_size=500, target_region=50,
-                                       num_unselected_positions=9000, pkl_file=pkl_file)  # 500 50 100000
 
-    print('finish 1')
-    raw_linkage_data =calculate_linkage_metric(selection_file, eval_idx_dict, haplo_file, pkl_file)
-    pkl.dump(eval_idx_dict,open(out_file,'wb'))
-    result=calculate_metric(raw_linkage_data, use_distance=False)
-    eval_idx_dict['result']=result
-    pkl.dump(eval_idx_dict,open(out_file,'wb'))
-    print('finish 2')
+    if 'targets' not in fix_variables[work_from][animal_gt]:
+        selection_file, haplo_file='',''
+        eval_idx_dict = get_eval_positions(selection_file, haplo_file, region_size=500, target_region=50,
+                                           num_unselected_positions=100000, pkl_file=pkl_file)  # 500 50 100000
+        pkl.dump(eval_idx_dict,open(out_file,'wb'))
+        print('finish short 1',flush=True)
+
+        if "start_haplos" in fix_variables[work_from][animal_gt]:
+            print('calculate linkage:')
+            pkl_data=calculate_linkages_all_reps(eval_idx_dict, fix_variables[work_from][animal_gt]["start_haplos"], pkl_file,window=50)
+            print('finish short 1',flush=True)
+            result=calculate_metric_chrom(pkl_data, use_distance=False)
+            eval_idx_dict['result'] = result
+            pkl.dump(eval_idx_dict, open(out_file, 'wb'))
+            print('finish short 2')
+    else:
+        haplo_file = fix_variables[work_from][animal_gt]["start_haplos"]
+        selection_file = fix_variables[work_from][animal_gt]["targets"]
+        eval_idx_dict = get_eval_positions(selection_file, haplo_file, region_size=500, target_region=50,
+                                           num_unselected_positions=9000, pkl_file=pkl_file)  # 500 50 100000
+        pkl.dump(eval_idx_dict,open(out_file,'wb'))
+        print('finish short 1',flush=True)
+        raw_linkage_data =calculate_linkage_metric(selection_file, eval_idx_dict, haplo_file, pkl_file)
+        result=calculate_metric(raw_linkage_data, use_distance=False)
+        eval_idx_dict['result']=result
+        pkl.dump(eval_idx_dict,open(out_file,'wb'))
+        print('finish 2')
+

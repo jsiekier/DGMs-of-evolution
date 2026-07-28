@@ -54,13 +54,32 @@ def read_all_data(animals, work_from='work_lap'):
         #log_p.append(log_p_partial)
 
     return  AFC, LD, estimated_s, Nes
+def get_SF_data(animals, work_from='work_lap',ld_idx=1):
+    SF = []
+    for animal in animals:
+        SF_partial = []
+        selection_pos_file = fix_variables[work_from][animal]["targets"]
+        sync_file = fix_variables[work_from][animal]["sync_process"]
+        targets, no_targets, targets_org_pos, no_targets_org_pos = read_targets(selection_pos_file, sync_file)
 
+        data = pickle.load(open(sync_file, 'rb'))
+        if isinstance(data['alleles'], dict):
+            allele_data = data['alleles']['2L']
+        else:
+            allele_data = data['alleles']
+        # shape: (# snps, rep, gen)
+        SF_partial.extend(
+            [np.mean(allele_data[no_targets, :, 0], axis=1), np.mean(allele_data[targets, :, 0], axis=1)])
+        SF.append(SF_partial)
+    return SF
 
 if __name__ == '__main__':
 
-    work_from='mogon'#'work_lap'#
+    work_from='home'
     experiment_number=1
+    create_2_in_one=False#True
     meta_data_file_name='meta_data_plus_exp2.pkl'
+    noise_level = '_noise14'
 
 
     x_axis_names = [["$\mathcal{N}(.9,.5)$\n$p_{LD}=.0$","$\mathcal{N}(.8,.5)$\n$p_{LD}=.0$","$\mathcal{N}(.7,.5)$\n$p_{LD}=.0$",
@@ -76,15 +95,17 @@ if __name__ == '__main__':
             x_axis_name.append("$n_{LD}="+n_ld+"$\n$|T|="+num_t+"$")
     x_axis_names.append(x_axis_name)
     x_axis_names=x_axis_names[experiment_number]
-    animals=[["gauss_09_05_noreg_pw0_1000_a01_noise14","gauss_08_05_noreg_pw0_1000_a01_noise14","gauss_07_05_noreg_pw0_1000_a01_noise14",
-              "gauss_09_05_noreg_pw20_1000_a01_noise14","gauss_08_05_noreg_pw20_1000_a01_noise14","gauss_07_05_noreg_pw20_1000_a01_noise14"],
-             ['max_0_r_t_50_n_noise14','max_0_r_t_25_n_noise14','max_0_r_t_10_n_noise14',
-              'max_4_r_t_50_n_noise14','max_4_r_t_25_n_noise14','max_4_r_t_10_n_noise14',
-              'max_8_r_t_50_n_noise14','max_8_r_t_25_n_noise14','max_8_r_t_10_n_noise14',
-              'max_12_r_t_50_n_noise14','max_12_r_t_25_n_noise14','max_12_r_t_10_n_noise14',]][experiment_number]
+    animals=[["gauss_09_05_noreg_pw0_1000_a01","gauss_08_05_noreg_pw0_1000_a01","gauss_07_05_noreg_pw0_1000_a01",
+              "gauss_09_05_noreg_pw20_1000_a01","gauss_08_05_noreg_pw20_1000_a01","gauss_07_05_noreg_pw20_1000_a01"],
+             ['max_0_r_t_50_n','max_0_r_t_25_n','max_0_r_t_10_n',
+              'max_4_r_t_50_n','max_4_r_t_25_n','max_4_r_t_10_n',
+              'max_8_r_t_50_n','max_8_r_t_25_n','max_8_r_t_10_n',
+              'max_12_r_t_50_n','max_12_r_t_25_n','max_12_r_t_10_n',]][experiment_number]
 
+    for i in range(len(animals)):
+        animals[i]+=noise_level
 
-
+    SF = get_SF_data(animals, work_from=work_from, ld_idx=2)
     # show ground truth data
     # s + chm on the estimated datasets
     AFC,LD,estimated_s,Nes=read_all_data(animals,work_from=work_from)
@@ -93,12 +114,17 @@ if __name__ == '__main__':
 
     # plot eveything:
 
-    [AFC,LD,estimated_s,Nes] = pickle.load(open(meta_data_file_name,'rb'))
-    data_subtitles=[
-                    ('LD', ['$\mathcal{N}_{50}$']),#'$\mathcal{N}_2$',
-                    ('AFC',['No targets','Targets']),
-                    ('Estimated $N_{e}$', ['']),
-                    ('Estimated $|s|$',['No targets','Targets']),
+    #[AFC,LD,estimated_s,Nes] = pickle.load(open(meta_data_file_name,'rb'))
+    data_subtitles = [
+        ('SF $f^{(0)}$', ['Non-targets', 'Targets'], ''),  # violin
+        ('LD $r^2$', ['$\mathcal{N}_{50}$'], ''),  # '$\mathcal{N}_2$', #violin
+        # ('AFC', ['No targets', 'Targets']),
+        ('Estimated $N_{e}$', [''], ''),
+        ('Estimated $|s|$', ['Non-Targets', 'Targets'], ''),
+
+        # ('CMH $-log(p)$',['no targets','targets'])
     ]
-    datas=[LD,AFC,Nes,estimated_s]
-    plot_dataset_details_box(datas,data_subtitles,x_axis_names,plt_out_name='dataset_summary_plus_exp2')
+    datas = [SF, LD, Nes, estimated_s]  # AFC,
+
+
+    plot_dataset_details_box(datas, data_subtitles, x_axis_names,plt_out_name= 'synthetic_noise14', plt_type='violin')

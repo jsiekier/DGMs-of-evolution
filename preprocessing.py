@@ -1,18 +1,11 @@
 from data_processing.create_pool_seq_file import convert_to_pool_seq_file
+from data_processing.random_nukleotide_flip import random_nucleotide_flip
 from data_processing.sampling_noise import make_noise_file
 from variables import fix_variables
 import argparse
 from data_processing.Data_loader import read_sync_file_bi_allelic
 
 
-
-
-work_from='mogon'
-num_generations=16
-num_replicates=10
-num_train_generations=16
-num_train_reps=10
-chrom='2L'
 
 def parse_animal_args():
     """ Adds animal-related arguments to a shared parser """
@@ -44,14 +37,35 @@ def get_haplo_bases(haplo_file):
 if __name__ == '__main__':
     args=parse_animal_args()
     animal=args.animal
+    work_from = 'mogon'
+    num_generations = fix_variables[animal]['num_generations']
+    num_replicates = fix_variables[animal]['num_replicates']
+    num_train_generations = fix_variables[animal]['num_generations']
+    num_train_reps = fix_variables[animal]['num_replicates']
+
 
     sync_file = fix_variables[work_from][animal]['sync']
     out_file = fix_variables[work_from][animal]['sync_process']
-    haplo_file=fix_variables[work_from][animal]['start_haplos']
-    haplo_bases = get_haplo_bases(haplo_file)
-    read_sync_file_bi_allelic(sync_file, num_generations, num_replicates, num_train_generations, num_train_reps,
-                              out_file,haplo_bases, zip=False)
 
-    animal_noise=animal+'noise14'#'noise25'#
-    make_noise_file(animal, animal_noise, [100], [40], chrom=chrom)
-    convert_to_pool_seq_file(animal_noise, chrom=chrom)
+    if 'targets' in fix_variables[work_from][animal]:
+        chrom='2L'
+        haplo_file=fix_variables[work_from][animal]['start_haplos']
+        haplo_bases = get_haplo_bases(haplo_file)
+        transpose=False
+        read_sync_file_bi_allelic(sync_file, num_generations, num_replicates, num_train_generations, num_train_reps,
+                                  out_file, haplo_bases, zip=False, transpose=transpose)
+        animal_noise = animal + 'noise14'
+        make_noise_file(animal, animal_noise, [100], [40], chrom=chrom)
+        convert_to_pool_seq_file(animal_noise, chrom=chrom)
+    else:
+        haplo_bases = None
+        transpose=True
+        read_sync_file_bi_allelic(sync_file, num_generations, num_replicates, num_train_generations, num_train_reps,
+                                  out_file, haplo_bases, zip=False, transpose=transpose)
+        random_nucleotide_flip(work_from=work_from, animals=[animal])
+
+
+
+
+
+

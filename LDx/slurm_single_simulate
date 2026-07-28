@@ -1,0 +1,99 @@
+#!/bin/bash
+#SBATCH -t 01:00:00
+#SBATCH -A account
+#SBATCH -p partition
+#SBATCH --mem=72000
+#SBATCH -J simulation
+#SBATCH --mail-type=None
+#SBATCH -o simulation-%A.output
+#SBATCH -e simulation-%A.error
+#SBATCH -n 1  # Number of tasks
+#SBATCH -c 4  # Number of cores
+
+module load lang/Java/13.0.2
+module load bio/BWA/0.7.17-GCCcore-11.2.0
+module load bio/SAMtools/1.13-GCC-11.2.0
+module load bio/BCFtools/1.14-GCC-11.2.0
+module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+module load lang/R/4.0.3-foss-2020b
+module load lang/Perl/5.32.0-GCCcore-10.2.0
+
+
+# Assign arguments to variables
+
+
+# Create local scratch directory for this job
+scratch_dir="/localscratch/${SLURM_JOB_ID}"
+mkdir -p "$scratch_dir"
+
+haplo_file="$1"
+out_file="$2"
+reads_R1="$3"
+reads_R2="$4"
+sim_sam="$5"
+sim_sorted="$6"
+sim_mpileup="$7"
+sim_sync="$8"
+out_file_sampled="$9"
+sim_vcf="${10}"
+ldx_result="${11}"
+tmp_bam="$12"
+tmp_fixmate="${scratch_dir}/$(basename "${sim_sam%.sam}").fixmate.bam" #"$13"
+sim_sam_sorted="${sim_sam%.sam}.dedup.sorted.sam"
+
+reference_fasta="/lustre/miifs01/project/m2_datamining/sync_data/dmel-all-chromosome-r5.57.clean.fasta"
+
+
+######################################
+srun python create_subsample.py --haplo_file "$haplo_file" --output_sampled "$out_file_sampled"
+
+
+
+# Map reads back to reference genome with BWA-MEM
+srun bwa index sync_data/dmel-all-chromosome-r5.57.clean.fasta
+
+srun java -jar mim2-v206.jar mimhap2fasta --mimhap "$out_file_sampled" --reference sync_data/dmel-all-chromosome-r5.57.clean.fasta --output-fasta "$out_file"
+
+# 2. Simulate paired-end Illumina reads with wgsim
+#   -N = number of read pairs
+#   -1/-2 = read length (here 150bp)
+#   -d = insert size (~350bp)
+#   -r = mutation rate (set to 0 for clean simulation)
+#   -e = base error rate (0.001 ~ realistic Illumina)
+#   -h = haplotype fasta input
+
+srun wgsim/wgsim -N 3068206 -1 150 -2 150 -d 350 -r 0 -e 0.001 "$out_file" "$reads_R1" "$reads_R2"
+
+# 3. Map reads to reference
+srun bwa mem -t 4 "$reference_fasta" "$reads_R1" "$reads_R2" > "$sim_sam"
+
+# 4. Convert SAM to BAM, fix mates, sort & index
+srun samtools view -bS "$sim_sam" > "$tmp_bam"
+srun samtools fixmate -m "$tmp_bam" "$tmp_fixmate"
+srun samtools sort -@ 4 -o "$sim_sorted" "$tmp_fixmate"
+srun samtools index "$sim_sorted"
+
+# 5. Remove PCR duplicates
+srun samtools markdup -r "$sim_sorted" "${sim_sorted%.bam}.dedup.bam"
+srun samtools index "${sim_sorted%.bam}.dedup.bam"
+
+# 6. Variant calling
+
+srun bcftools mpileup -Ou -f "$reference_fasta" "${sim_sorted%.bam}.dedup.bam" \
+  | bcftools call -mv -Oz -o "$sim_vcf"
+
+srun bcftools sort -Oz -o "${sim_vcf%.vcf.gz}.sorted.vcf.gz" "$sim_vcf"
+srun bcftools index -f "${sim_vcf%.vcf.gz}.sorted.vcf.gz"
+
+# 7. Prepare SAM for LDx
+srun samtools view -h "${sim_sorted%.bam}.dedup.bam" > "$sim_sam_sorted"
+
+# 8. Run LDx
+srun perl ./LDx.pl "$sim_sam_sorted" "${sim_vcf%.vcf.gz}.sorted.vcf.gz" > "$ldx_result"
+
+
+
+####################################
+
+
+

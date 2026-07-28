@@ -1,13 +1,12 @@
 import numpy as np
-
 from numpy import inf
+
 
 def calculate_metric(raw_linkage_metric,use_distance=False):
     # read most important data:
-    (eval_positions,all_n_f,all_n_t,all_n_t_distance,all_n_f_distance,all_n_t_effect,afc,all_f_t,all_f_t_distance,all_n_afc,all_n_f_rsquare,all_n_f_D_normal)=raw_linkage_metric
-    alphas=[1]#[1,2,3,4,5,6,10,20,50]
-    # naive def 1 without distance_data:
-    # step 1 summ targets:
+    (eval_positions,all_n_f,all_n_t,all_n_t_distance,all_n_f_distance,all_n_t_effect,
+     afc,all_f_t,all_f_t_distance,all_n_afc,all_n_f_rsquare,all_n_f_D_normal,all_n_f_r_no_square)=raw_linkage_metric
+    alphas=[1]
     max_distance_n_t=0
     for row in all_n_t_distance:
         for e in row:
@@ -21,9 +20,6 @@ def calculate_metric(raw_linkage_metric,use_distance=False):
         linkage_def1=[]
         linkage_def_kramer=[]
         linkage_to_target=[]
-
-
-
 
         for n_f,n_t,n_t_distance,n_f_distance,n_t_effect in zip(all_n_f,all_n_t,all_n_t_distance,all_n_f_distance,all_n_t_effect):
             #n_t_mean=np.asarray([ sum(entry)/len(entry) for entry in n_t ])
@@ -40,7 +36,6 @@ def calculate_metric(raw_linkage_metric,use_distance=False):
                             weighted_linkage += e * effect
                 n_t_mean.append(weighted_linkage)
             n_t_mean=np.asarray(n_t_mean)
-
 
             metric=n_f*n_t_mean#
             if use_distance:
@@ -90,10 +85,19 @@ def calculate_metric(raw_linkage_metric,use_distance=False):
 
         #save linkage metric:
         result=[eval_positions,afc,linkage_def1,linkage_def_kramer,
-                no_window_linkage_def,tmp_distance,afc_neighbor_metric,afc_neighbor_linkage_corr,all_n_f,all_n_f_rsquare,all_n_f_D_normal]
+                no_window_linkage_def,tmp_distance,afc_neighbor_metric,afc_neighbor_linkage_corr,all_n_f,all_n_f_rsquare,all_n_f_D_normal,all_n_f_r_no_square]
         return result
 
 
+def calculate_metric_chrom(raw_linkage_metric, use_distance=False):
+    # read most important data:
+    #(eval_positions_, all_n_f_rep, all_n_f_distance_rep, afc_rep, all_n_afc_rep, linkage_trust_dict_rep,sf_rep)=raw_linkage_metric
+    (eval_positions_, all_n_f, all_n_f_distance, afc_filter, all_n_afc, linkage_trust_dict, sf_filter, all_n_f_rsquare,
+    all_n_f_D_normal, all_n_f_r_no_square)=raw_linkage_metric
+
+
+    result = [eval_positions_, linkage_trust_dict, sf_filter, all_n_f, all_n_f_rsquare,all_n_f_D_normal, all_n_f_r_no_square]
+    return result
 
 
 

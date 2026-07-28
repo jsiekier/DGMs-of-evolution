@@ -6,23 +6,27 @@ from collections import Counter
 import time
 import matplotlib
 
-
 matplotlib.rcParams['lines.markersize'] = 5
 
 
 def calculate_all_linkages_nans(position, neighbors, haplotype_dict):
 
     linkages = []
+    r_square=[]
+    normal_D=[]
+    r_norm=[]
     linkage_trust = []
 
-    haplotypes2, len_haplo2, num_char_0_2, num_char_1_2, num_nan_2 = haplotype_dict[position]
+    #haplotypes2, len_haplo2, num_char_0_2, num_char_1_2, num_nan_2 = haplotype_dict[position]
+    haplotypes2, len_haplo2 = haplotype_dict[position]
 
 
     for idx_n in neighbors:
 
         if position != idx_n:
 
-            haplotypes1, len_haplo1, num_char_0_1, num_char_1_1, num_nan_1 = haplotype_dict[idx_n]
+            #haplotypes1, len_haplo1, num_char_0_1, num_char_1_1, num_nan_1 = haplotype_dict[idx_n]
+            haplotypes1, len_haplo1= haplotype_dict[idx_n]
 
 
             haplo_zips = list(zip(haplotypes1, haplotypes2))
@@ -30,47 +34,68 @@ def calculate_all_linkages_nans(position, neighbors, haplotype_dict):
             counter = Counter(haplo_zips)
             num_real_haplos=counter[(0, 0)]+counter[(1, 1)]+counter[(0, 1)]+counter[(1, 0)]
             #linkage_trust.append(min(1 - (num_nan_2 / len_haplo2), 1 - (num_nan_1 / len_haplo1)))
-            linkage_trust.append(num_real_haplos/len_haplo1)
-            D = 0
+            if not num_real_haplos:
+                linkage_trust.append(num_real_haplos/len_haplo1)
             if num_real_haplos:
 
                 freqsA1B1 = counter[(0, 0)] / num_real_haplos
-                freqsA2B2 = counter[(1, 1)] / num_real_haplos
+                #freqsA2B2 = counter[(1, 1)] / num_real_haplos
 
-                freqsA1B2 = counter[(0, 1)] / num_real_haplos
-                freqsA2B1 = counter[(1, 0)] / num_real_haplos
+                #freqsA1B2 = counter[(0, 1)] / num_real_haplos
+                #freqsA2B1 = counter[(1, 0)] / num_real_haplos
 
-                D = (freqsA1B1 * freqsA2B2) - (freqsA1B2 * freqsA2B1)
                 p1 = (counter[(0, 1)]+counter[(0, 0)])/num_real_haplos
                 p2 = (counter[(1, 1)]+counter[(1, 0)])/num_real_haplos
                 q1 = (counter[(0, 0)]+counter[(1, 0)])/num_real_haplos
                 q2 = (counter[(1, 1)]+counter[(0, 1)])/num_real_haplos
-
-                divisor=0
-                if D > 0:
-                    divisor=min([p1 * q2, p2 * q1])
-
-                elif D < 0:
-                    divisor=max([-p1 * q1, -p2 * q2])
-                if divisor:
-                    D /= divisor
+                if p1==1 or p1==0 or p2==1 or p2==0 or q1==1 or q1==0 or q2==1 or q2==0:
+                    linkage_trust.append(0)
                 else:
-                    D=0
+                    linkage_trust.append(num_real_haplos/len_haplo1)
+                D = freqsA1B1 - (p1 * q1)
+                # D = (freqsA1B1 * freqsA2B2) - (freqsA1B2 * freqsA2B1)
+                # D_tmp=D
 
-            linkages.append(D)
+                divisor = (p1 * p2 * q1 * q2)
+                normal_D.append(D)
+                if divisor:
+                    rr = (D * D) / divisor
+                    r = D / np.sqrt(divisor)
+                else:
+                    rr = D
+                    r = D
+                if D > 0:
+                    tmp1 = [p1 * q2, p2 * q1]
+                    D /= min(tmp1)
+                elif D < 0:
+                    tmp1 = [-p1 * q1, -p2 * q2]
+                    D /= max(tmp1)
+
+                r_square.append(rr)
+                linkages.append(D)
+                r_norm.append(r)
+            else:
+                r_norm.append(1.0)
+                r_square.append(1.0)
+                normal_D.append(1.0)
+                linkages.append(1.0)
+
+            #linkages.append(D)
         else:
+            r_norm.append(1.0)
+            r_square.append(1.0)
+            normal_D.append(1.0)
             linkages.append(1.0)
-    if not len(linkages):
-        print('Error')
-        return []
 
-    return linkages, linkage_trust
+
+    return linkages,r_square,normal_D,r_norm, linkage_trust
 
 def calculate_all_linkages( position, neighbors, haplotype_dict):
     linkages = []
     r_square=[]
     normal_D=[]
     filter_positions=[]
+    r_norm=[]
     haplotypes2,freq2 = haplotype_dict[position]
 
 
@@ -103,8 +128,10 @@ def calculate_all_linkages( position, neighbors, haplotype_dict):
             normal_D.append(D)
             if divisor:
                 rr = (D * D) / divisor
+                r=D/np.sqrt(divisor)
             else:
                 rr = D
+                r=D
             if D > 0:
                 tmp1=[p1 * q2, p2 * q1]
                 D /= min(tmp1)
@@ -115,7 +142,9 @@ def calculate_all_linkages( position, neighbors, haplotype_dict):
 
             r_square.append(rr)
             linkages.append(D)
+            r_norm.append(r)
         else:
+            r_norm.append(1.0)
             r_square.append(1.0)
             normal_D.append(1.0)
             linkages.append(1.0)
@@ -124,7 +153,7 @@ def calculate_all_linkages( position, neighbors, haplotype_dict):
         print('Error')
         return []
 
-    return linkages,r_square,normal_D,filter_positions
+    return linkages,r_square,normal_D,r_norm,filter_positions
 base_to_idx={'a':0,'A':0,'t':1,'T':1,'c':2,'C':2,'g':3,'G':3}
 nukleotide_to_char={0:'A',1:'T',2:'C',3:'G'}
 
@@ -181,6 +210,40 @@ def read_haplo_file_no_nucleotides(input_file_name):
                 #haplotypes1=[int(char) for char in haplotypes1]
                 haplotypes1 =list(map(int,haplotypes1))
                 haplotype_dict[pos]=((haplotypes1,sum(haplotypes1)/len(haplotypes1)))
+                line_counter+=1
+    print((time.time() - start_time) / 60, 'time for haplo reading')
+
+    return haplotype_dict
+
+
+def read_haplo_file_chrom_no_nucleotides(input_file_name):
+    haplotype_dict = dict()
+    start_time=time.time()
+    line_counter=0
+    with open(input_file_name, 'r') as f:  # open(input_file_name, 'r') as f:#
+        for line in f:
+            if not line.startswith('#'):
+                k = line.split("\t")
+                chrm = k[0]
+                if chrm not in haplotype_dict:
+                    haplotype_dict[chrm]=dict()
+                pos = int(k[1])  # -1
+                haplotypes1 = k[4].split()
+                haplotypes1 = ''.join(haplotypes1)
+                #nukleotide_1,nukleotide_2=nucleotide_idx[line_counter]
+               # characters=[nukleotide_to_char[nukleotide_1],nukleotide_to_char[nukleotide_2]]
+                haplotypes1.replace('N', '')
+                characters = list(set(haplotypes1))
+                if len(characters) == 2:
+                    haplotypes1 = haplotypes1.replace(characters[0], '0').replace(characters[1], '1')
+                    haplotypes1 = list(map(int, haplotypes1))
+                    haplotype_dict[chrm][pos] = ((haplotypes1, sum(haplotypes1) / len(haplotypes1)))
+                elif len(characters):
+                    haplotypes1 = haplotypes1.replace(characters[0], '1')
+                    haplotypes1 = list(map(int, haplotypes1))
+                    haplotype_dict[chrm][pos] = ((haplotypes1, sum(haplotypes1) / len(haplotypes1)))
+                else:
+                    haplotype_dict[chrm][pos] = (([],None ))
                 line_counter+=1
     print((time.time() - start_time) / 60, 'time for haplo reading')
 
@@ -245,6 +308,10 @@ def read_haplo_file_chrom(input_file_name,nukleotide_idx,positions):
     fig.tight_layout()
     fig.savefig('plots/nan_analysis.png')
 
+    print('debug num positions per chrom in haplotypes:')
+    for key in haplotype_dict.keys():
+        print(key, len(haplotype_dict[key].keys()))
+
     return haplotype_dict
 
 
@@ -276,7 +343,6 @@ def read_afc(pkl_file,chrom='2L'):
     mean_AFC = np.mean(allele_data[:, :, 0] - allele_data[:, :, 5],axis=1)
     return mean_AFC,positions,nucleotide_idx
 
-
 def read_afc_chrom(pkl_file,rep,afc_generation=3):
 
 
@@ -286,7 +352,9 @@ def read_afc_chrom(pkl_file,rep,afc_generation=3):
     pos_less=dict()
     mean_AFC=dict()
     sf=dict()
+    print('debug num positions per chrom in sync:')
     for key in allele_data.keys():
+        print(key,allele_data[key].shape[0])
         if rep>=0:
             #TODO
             mean_AFC[key] = np.abs(np.squeeze(allele_data[key])[:, rep, 0] -
@@ -305,14 +373,18 @@ def read_afc_chrom(pkl_file,rep,afc_generation=3):
 
 
 
-
-
-def linkage_base(eval_positions_,haplo_file,pkl_file,window,rep):
-    mean_AFC, positions, nukleotide_idx, sf = read_afc_chrom(pkl_file,rep)
+def calculate_linkages_all_reps(eval_positions_, haplo_file, pkl_file, window):
+    #linkage_base(eval_positions_, haplo_file, pkl_file, window, rep)
+    mean_AFC, positions, nukleotide_idx, sf = read_afc_chrom(pkl_file,rep=-1,afc_generation=3)
     # read eval file to get eval positions:
     haplo_data_chrom = read_haplo_file_chrom(haplo_file, nukleotide_idx, positions)
 
     all_n_f = dict()
+    all_n_f_rsquare=dict()
+    all_n_f_D_normal=dict()
+    all_n_f_r_no_square=dict()
+
+
     all_n_f_distance = dict()
     all_n_afc = dict()
     linkage_trust_dict = dict()
@@ -328,13 +400,17 @@ def linkage_base(eval_positions_,haplo_file,pkl_file,window,rep):
         all_n_afc[key] = []
         linkage_trust_dict[key] = []
 
+        all_n_f_rsquare[key] = []
+        all_n_f_D_normal[key] = []
+        all_n_f_r_no_square[key] = []
+
         gen_pos_to_arr_pos = dict()
         # print(key)
         for arr_pos, gen_pos in enumerate(positions[key]):
             gen_pos_to_arr_pos[gen_pos] = arr_pos
 
         for p_idx, pos in enumerate(eval_positions):
-            if p_idx % 10 == 0:
+            if p_idx % 100 == 0:
                 print('Linkage:', p_idx, 'out of', len(eval_positions), key, len(mean_AFC[key]))
 
             chrom_pos_focus = positions[key][pos]
@@ -345,17 +421,28 @@ def linkage_base(eval_positions_,haplo_file,pkl_file,window,rep):
             for n in neighbor_pos:
                 neighbor_afc.append(mean_AFC[key][gen_pos_to_arr_pos[n]])
             all_n_afc[key].append(neighbor_afc)
-            #print(all_n_afc[key][-1])
-            link_x_s, linkage_trust = calculate_all_linkages_nans(chrom_pos_focus, neighbor_pos,
-                                                                  haplotype_dict=haplo_data)
+            # print(all_n_afc[key][-1])
+            link_x_s,r_square,normal_D,r_norm, linkage_trust = calculate_all_linkages_nans(chrom_pos_focus, neighbor_pos,haplotype_dict=haplo_data)
 
             link_x_s = np.asarray(link_x_s)
             all_n_f[key].append(link_x_s)
+            all_n_f_rsquare[key].append(np.asarray(r_square))
+            all_n_f_D_normal[key].append(np.asarray(normal_D))
+            all_n_f_r_no_square[key].append(np.asarray(r_norm))
+
+
+
             all_n_f_distance[key].append([abs(chrom_pos_focus - p) for p in neighbor_pos])
             linkage_trust_dict[key].append(linkage_trust)
         afc_filter[key] = mean_AFC[key][eval_positions]
         sf_filter[key] = sf[key][eval_positions]
-    return all_n_f, all_n_f_distance,afc_filter, all_n_afc,linkage_trust_dict,sf_filter
+    #return all_n_f, all_n_f_distance, afc_filter, all_n_afc, linkage_trust_dict, sf_filter
+    # save everything in pkl_file:
+    pkl_data = (eval_positions_, all_n_f, all_n_f_distance,afc_filter, all_n_afc,linkage_trust_dict,sf_filter, all_n_f_rsquare, all_n_f_D_normal, all_n_f_r_no_square)
+    #pkl_data = (eval_positions, all_n_f, all_n_t, all_n_t_distance, all_n_f_distance, all_n_t_effect, afc, all_f_t,
+    #            all_f_t_distance, all_n_afc, all_n_f_rsquare, all_n_f_D_normal, all_n_f_r_no_square)
+
+    return pkl_data
 
 
 
@@ -367,6 +454,7 @@ def calculate_linkage_metric1(selection_positions, positions, eval_positions, ha
     target_positions=list(selection_positions.keys())
     all_n_f=[]
     all_n_f_rsquare=[]
+    all_n_f_r_no_square=[]
     all_n_f_D_normal=[]
     all_n_t=[]
     all_n_t_distance=[]
@@ -398,7 +486,7 @@ def calculate_linkage_metric1(selection_positions, positions, eval_positions, ha
         focus_afc=afc_all[pos]
 
         for n in neighbor_pos:
-            target_linkage,_,_,filter_position=calculate_all_linkages(n, target_positions, haplotype_dict=haplo_data)
+            target_linkage,_,_,_,filter_position=calculate_all_linkages(n, target_positions, haplotype_dict=haplo_data)
             targets_mean=sum(target_linkage)/len(target_linkage)
             neighbor_linkages.append(targets_mean)
             neighbor_linkages_tmp.append(target_linkage)
@@ -410,14 +498,6 @@ def calculate_linkage_metric1(selection_positions, positions, eval_positions, ha
             neighbor_afc_tmp=afc_all[gen_pos_to_arr_pos[n]]
             tmp_afc.append((focus_afc,neighbor_afc_tmp))
 
-
-
-
-
-
-
-
-
         all_n_afc.append(neighbor_afc)
         all_n_t.append(neighbor_linkages_tmp)
         all_n_t_distance.append(positions_tmp)
@@ -427,7 +507,7 @@ def calculate_linkage_metric1(selection_positions, positions, eval_positions, ha
         #link_s_t=np.mean(neighbor_linkages,axis=-1)
 
         # for all neighbors - calculate linkage with focus snp
-        link_x_s,r_square,normal_D,filter_position=calculate_all_linkages(chrom_pos_focus, neighbor_pos, haplotype_dict=haplo_data)
+        link_x_s,r_square,normal_D,r_no_square,filter_position=calculate_all_linkages(chrom_pos_focus, neighbor_pos, haplotype_dict=haplo_data)
         tmp_linkage.extend(link_x_s)
 
         #print('x_s',link_x_s)
@@ -435,11 +515,12 @@ def calculate_linkage_metric1(selection_positions, positions, eval_positions, ha
         all_n_f.append(link_x_s)
         all_n_f_rsquare.append(np.asarray(r_square))
         all_n_f_D_normal.append(np.asarray(normal_D))
+        all_n_f_r_no_square.append(np.asarray(r_no_square))
 
         all_n_f_distance.append([abs(chrom_pos_focus-p) for p in filter_position])
 
         # calculate linkage with focus snp to all targets
-        link_f_t,_,_,filter_position_f_t=calculate_all_linkages(chrom_pos_focus, target_positions, haplotype_dict=haplo_data)
+        link_f_t,_,_,_,filter_position_f_t=calculate_all_linkages(chrom_pos_focus, target_positions, haplotype_dict=haplo_data)
         all_f_t.append(link_f_t)
 
         all_f_t_distance.append([abs(p-chrom_pos_focus) for p in filter_position_f_t])
@@ -452,7 +533,7 @@ def calculate_linkage_metric1(selection_positions, positions, eval_positions, ha
         linkage_metric.append(naive_metric)
 
     # save everything in pkl_file:
-    pkl_data=(eval_positions,all_n_f,all_n_t,all_n_t_distance,all_n_f_distance,all_n_t_effect,afc,all_f_t,all_f_t_distance,all_n_afc,all_n_f_rsquare,all_n_f_D_normal)
+    pkl_data=(eval_positions,all_n_f,all_n_t,all_n_t_distance,all_n_f_distance,all_n_t_effect,afc,all_f_t,all_f_t_distance,all_n_afc,all_n_f_rsquare,all_n_f_D_normal,all_n_f_r_no_square)
 
     #pkl.dump(pkl_data,open(out_path,'wb'))
     #print('Finish')

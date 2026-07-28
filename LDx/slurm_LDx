@@ -1,0 +1,96 @@
+#!/bin/bash
+#SBATCH -t 05:00:00  # 6 hours
+#SBATCH -A m2_datamining
+#SBATCH -p longtime
+#SBATCH --mem=35000  # 72GB memory
+#SBATCH -J simulation
+#SBATCH --mail-type=None
+#SBATCH -o simulation-%A.output
+#SBATCH -e simulation-%A.error
+#SBATCH -n 1  # Number of tasks
+#SBATCH -c 4  # Number of cores
+
+#module load lang/Java/1.8.0_202
+#module load bio/BWA/0.7.17-GCCcore-11.2.0
+#module load bio/SAMtools/1.13-GCC-11.2.0
+#module load bio/BCFtools/1.14-GCC-11.2.0 
+module load lang/Perl/5.32.0-GCCcore-10.2.0
+
+#module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+#module load lang/R/4.0.3-foss-2020b
+
+
+
+# Assign arguments to variables
+
+
+# Create local scratch directory for this job
+scratch_dir="/localscratch/${SLURM_JOB_ID}"
+mkdir -p "$scratch_dir"
+
+#haplo_file="$1"
+sim_vcf_filter="$2"
+reads_R1="$3"
+reads_R2="$4"
+sim_dedup="$5"
+sim_sorted="$6"
+sim_sam="$7"
+#sim_sync="$8"
+#out_file_sampled="$9"
+sim_vcf="${10}"
+ldx_result="${11}"
+tmp_bam="${12}" #"/lustre/miifs01/project/m2_datamining/sync_data/LDx/bam_files/Dsim_Fl_base_2_b.bam" #
+#tmp_fixmate="${scratch_dir}/$(basename "${sim_sam%.sam}").fixmate.bam" #"$13"
+#sim_sam_sorted="${sim_sam%.sam}.dedup.sorted.sam"
+reads_R1_trim="${14}"
+reads_R2_trim="${15}"
+chrom="${16}"
+
+sim_coords="${scratch_dir}/mapped.coords.bam"
+sim_fixmate="${scratch_dir}/mapped.fixmate.bam"
+sim_2L="${scratch_dir}/sim_2L.bam"
+
+
+
+
+reference_fasta="/LDx/GCA_000820565.1_M252_genomic_clean.fna"
+
+bwa index "$reference_fasta"
+######################################
+srun samtools view -H "$tmp_bam"
+srun samtools idxstats "$tmp_bam"
+#0.2.1
+
+java -jar ReadTools.jar TrimReads --input "$reads_R1" --input2 "$reads_R2" --output "$tmp_bam" --minReadLength 50 --disable5pTrim true --mottQualityThreshold 18 --forceOverwrite
+samtools fastq "$tmp_bam" -1 "$reads_R1_trim" -2 "$reads_R2_trim" -0 /dev/null -s /dev/null -n
+bwa mem -t 8 "$reference_fasta" "$reads_R1_trim" "$reads_R2_trim" | samtools sort -n -o "$sim_sorted"
+
+samtools fixmate -m "$sim_sorted" "$sim_fixmate"
+samtools sort -o "$sim_coords" "$sim_fixmate" 
+samtools markdup -r "$sim_coords" "$sim_dedup" 
+samtools index "$sim_dedup"  
+
+samtools view -b "$sim_dedup" "$chrom" > "$sim_2L"
+samtools index "$sim_2L"
+samtools view -h "$sim_2L" > "$sim_sam"
+
+
+# 5. crete vcf:
+bcftools mpileup -Ou -f "$reference_fasta" "$sim_2L" | bcftools call -mv -Oz -o "$sim_vcf"
+bcftools index "$sim_vcf"
+
+# variant filtering (optional?)
+
+bcftools filter -e 'QUAL<20 || DP<10' "$sim_vcf" -Oz -o "$sim_vcf_filter"
+bcftools index "$sim_vcf_filter"
+
+
+#perl ./LDx.pl -l 1 -h 10000 -q 1 -a 0 -i 1 -s 1000 "$sim_sam" "$sim_vcf_filter" > "$ldx_result"
+perl ./LDx.pl "$sim_sam" "$sim_vcf_filter" > "$ldx_result"
+
+
+
+
+
+
+

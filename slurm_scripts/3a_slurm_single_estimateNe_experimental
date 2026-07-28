@@ -1,0 +1,26 @@
+#!/bin/bash
+#SBATCH -t 04:00:00 #5 hours#120
+#SBATCH -A m2_datamining
+#SBATCH -p devel
+#SBATCH --mem=36000 #memory in MB
+#SBATCH -J s_estimation
+#SBATCH --mail-type=None
+#SBATCH -o estimation_n-%A.output
+#SBATCH -e estimation_n-%A.error
+#SBATCH -n 1 #number of tasks
+#SBATCH -c 1 #number of cores (use more for multithreading)
+
+
+# Load required modules
+# module load lang/R/4.0.3-foss-2020b
+module load lib/TensorFlow/2.6.0-foss-2021a-CUDA-11.3.1
+module load vis/matplotlib/3.4.2-foss-2021a
+
+
+
+srun Rscript estimate_Ne_experimental.R
+
+# write in fix variables
+
+srun python write_Nes.py
+srun python simple_analyse_sync.py --animal "experimental" --animal_no_noise "experimental"

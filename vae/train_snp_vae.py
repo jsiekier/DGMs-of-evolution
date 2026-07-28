@@ -5,8 +5,7 @@ import json
 import time
 import tensorflow as tf
 
-from data_processing.Data_loader import Dataset_loader_VAE_bi_allelic, DS_loader_bi_allelic_replicates, \
-    Dataset_loader_VAE_bi_allelic_debug
+from data_processing.Data_loader import Dataset_loader_VAE_bi_allelic, DS_loader_bi_allelic_replicates
 
 tf.keras.backend.set_floatx('float32')
 import random
@@ -56,7 +55,7 @@ def print_loss(losses, train_step_time,stopping_counter,title,step,summary_write
     print('step: '+str(step)+', stopping counter: '+str(stopping_counter)+' time: '+str(round(train_step_time,2)),flush=True)
 
 
-def load_dna_cnn(args,MAX_GENE_LENGTH,NUM_INIT_COLOR_CHANELS,checkpoint_path=None,model_part=''):
+def load_dna_cnn(args, MAX_GENE_LENGTH, NUM_INIT_COLOR_CHANELS, checkpoint_path=None, model_part=''):
     dna_cnn = DNA_VAE(activation=args.non_linearity,
                       max_gene_length=MAX_GENE_LENGTH,
                       num_init_color_chanels=NUM_INIT_COLOR_CHANELS,
@@ -95,8 +94,53 @@ def load_dna_cnn(args,MAX_GENE_LENGTH,NUM_INIT_COLOR_CHANELS,checkpoint_path=Non
                       sf_ex_alpha=args.sf_ex_alpha,
                       model_part=model_part,
                       debug=args.debug,
-                      multiply_result=args.multiply_result
+                      multiply_result=args.multiply_result,
+                      integrate_focus=args.integrate_focus,
+                      free_bits=args.free_bits,
+                      NLL_lambda=args.NLL_lambda,
+
+                      data_transform=args.data_transform,
+                      enc1_activation=args.enc1_activation,
+                      use_enc3=args.use_enc3,
+                      use_neg_softmax=args.use_neg_softmax
                       )
+
+    if checkpoint_path != None:
+
+        ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=dna_cnn.optimizer, net=dna_cnn)
+        manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=3)  # _train
+        # dummy_input = tf.random.normal((1, args.time_batch_size, MAX_GENE_LENGTH, NUM_INIT_COLOR_CHANELS))
+
+        if args.integrate_focus:
+            num_neighbors = (args.num_neighbors * 2) + 1
+        else:
+            num_neighbors = args.num_neighbors * 2
+
+        # this triggers variable creation & graph connection
+        if dna_cnn.include_parallel_info:
+
+            dummy_focus = tf.random.normal((3, 10, args.time_batch_size))
+            dummy_neighbors = tf.random.normal((3, num_neighbors, 10, args.time_batch_size))
+            dummy_distances = tf.random.normal((3, num_neighbors))
+            dummy_output = tf.random.normal((3, 10))
+            print('build model parallel')
+            _ = dna_cnn.vae_execution_parallel(dummy_neighbors, dummy_focus, dummy_output, dummy_distances, beta=0.001,
+                                               training=True)
+        else:
+
+            dummy_focus = tf.random.normal((3, args.time_batch_size))
+            dummy_neighbors = tf.random.normal((3, num_neighbors, args.time_batch_size))
+            dummy_distances = tf.random.normal((3, num_neighbors))
+            dummy_output = tf.random.normal((3,))
+            print('build model non parallel')
+            _ = dna_cnn.vae_execution(dummy_neighbors, dummy_focus, dummy_output, dummy_distances, training=False)
+
+        ckpt.restore(manager.latest_checkpoint)  # .expect_partial()
+        if manager.latest_checkpoint:
+            print("Restored from {}".format(manager.latest_checkpoint))
+        else:
+            print("ERROR: No Checkpoint file available!", checkpoint_path)
+
     return dna_cnn
 
 
@@ -107,7 +151,8 @@ def main_training(args,use_tensorboard=False,tmp_data_folder='',kld_influence=0.
 
         model_path=tmp_data_folder+"models/" +args.nn_name+'_fine'
         if not os.path.exists(model_path):
-            os.makedirs(model_path)
+            print('create', model_path, flush=True)
+            os.makedirs(model_path, exist_ok=True)
             print('create', model_path, flush=True)
         shutil.copyfile(model_path[:-5] + "/output.json", model_path + "/output.json")
         json_file = open(model_path + "/output.json", 'r')
@@ -120,7 +165,8 @@ def main_training(args,use_tensorboard=False,tmp_data_folder='',kld_influence=0.
     else:
         model_path=tmp_data_folder+"models/" +args.nn_name
         if not os.path.exists(model_path):
-            os.makedirs(model_path)
+            print('create', model_path, flush=True)
+            os.makedirs(model_path, exist_ok=True)
             print('create', model_path, flush=True)
         output_1 = model_path + "/output.json"
         out_1 = open(output_1, 'w')
@@ -163,16 +209,19 @@ def main_training(args,use_tensorboard=False,tmp_data_folder='',kld_influence=0.
                                         'num_neighbors':args.num_neighbors,
                                          'num_train_reps':num_train_reps,
                                         'max_dist_neighbor':None,
-                                         'fine_tune':args.fine_tune}
+                                         'fine_tune':args.fine_tune,'integrate_focus':args.integrate_focus}
+
+
     if args.include_parallel_info:
         dataset_train = DS_loader_bi_allelic_replicates(**input_args)
     else:
-        if args.debug:
-            dataset_train = Dataset_loader_VAE_bi_allelic_debug(**input_args)
-        else:
-            dataset_train = Dataset_loader_VAE_bi_allelic(**input_args)
+        dataset_train = Dataset_loader_VAE_bi_allelic(**input_args)
 
     gene_loader_train = dataset_train.batch(BATCHSIZE).prefetch(tf.data.experimental.AUTOTUNE)
+    if not args.include_parallel_info:
+        input_args['eval_positions']=fix_variables[work_from][animal]['eval_positions']
+        input_args['filter']=0.5
+
 
     if fine_tuning:
         if loading_name == '':
@@ -188,15 +237,16 @@ def main_training(args,use_tensorboard=False,tmp_data_folder='',kld_influence=0.
 
         else:
             checkpoint_path = tmp_data_folder+"models/" +loading_name+ '/tf_ckpts_last'
+
+
     dna_cnn = load_dna_cnn(args, MAX_GENE_LENGTH, NUM_INIT_COLOR_CHANELS, checkpoint_path,model_part)#
+
     print('Model creation finished',flush=True)
     ckpt_last = tf.train.Checkpoint(step=tf.Variable(1), optimizer=dna_cnn.optimizer, net=dna_cnn)
     manager_last = tf.train.CheckpointManager(ckpt_last, model_path + '/tf_ckpts_last', max_to_keep=2)
 
     early_stop_counter=0
     curr_loss=1000000
-    #rising_factor=kld_influence
-    #beta=rising_factor
 
     start_time = time.time()
     algo_time = time.time()
@@ -219,6 +269,7 @@ def main_training(args,use_tensorboard=False,tmp_data_folder='',kld_influence=0.
         ckpt_last.step.assign_add(1)
 
 
+
         train_losses,z_reps_mean,z_reps_std,metadata= dna_cnn.train_iterations_lstm(gene_loader_train, train_generations, beta=curr_KLD_influence)
 
         if i % print_every == 0:
@@ -227,7 +278,9 @@ def main_training(args,use_tensorboard=False,tmp_data_folder='',kld_influence=0.
                        (time.time() - start_time) / 60,
                        early_stop_counter,
                        'train',i,train_summary_writer,z_reps_mean,z_reps_std,beta=curr_KLD_influence,metadata=metadata)
-            print('attention linkage correlation',metadata)
+            #print('attention linkage correlation',metadata)
+
+            #print(train_losses)
             start_time = time.time()
             if np.isnan(train_losses[0]):
                 print('load old checkpoint')
@@ -242,6 +295,8 @@ def main_training(args,use_tensorboard=False,tmp_data_folder='',kld_influence=0.
 
                 else:
                     early_stop_counter += 1
+
+
 
 
 
