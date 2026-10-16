@@ -16,7 +16,7 @@ def read_all_data(animals, work_from='work_lap'):
     # 1. get direct neighbor linkage
     # 2. get random neighbor linkage
 
-    LD = calculate_LD_on_subset(animals, work_from=work_from, sample_size=1000, n_window=50)
+    LD = calculate_LD_on_subset(animals, work_from=work_from, sample_size=1000, n_window=50,ld_idx=3)
 
     for animal in animals:
         #animal_gt = animal_stuff[0][0]

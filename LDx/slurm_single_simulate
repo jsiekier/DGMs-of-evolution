@@ -41,7 +41,7 @@ tmp_bam="$12"
 tmp_fixmate="${scratch_dir}/$(basename "${sim_sam%.sam}").fixmate.bam" #"$13"
 sim_sam_sorted="${sim_sam%.sam}.dedup.sorted.sam"
 
-reference_fasta="/lustre/miifs01/project/m2_datamining/sync_data/dmel-all-chromosome-r5.57.clean.fasta"
+reference_fasta="/lustre/miifs01/project/m2_datamining/sync_data/dmel-2L-chromosome-r5.57.clean.fasta"
 
 
 ######################################
@@ -89,7 +89,8 @@ srun bcftools index -f "${sim_vcf%.vcf.gz}.sorted.vcf.gz"
 srun samtools view -h "${sim_sorted%.bam}.dedup.bam" > "$sim_sam_sorted"
 
 # 8. Run LDx
-srun perl ./LDx.pl "$sim_sam_sorted" "${sim_vcf%.vcf.gz}.sorted.vcf.gz" > "$ldx_result"
+srun perl ./LDx.pl -l 1 -h 10000 -q 1 -a 0.00001 -i 1 -s 1000 "$sim_sam_sorted" "${sim_vcf%.vcf.gz}.sorted.vcf.gz" > "$ldx_result"
+
 
 
 

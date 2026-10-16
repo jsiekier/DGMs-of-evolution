@@ -141,10 +141,10 @@ if __name__ == '__main__':
                         nn_name = f"VVAE_max_{noise_path}_r_t_{num_target}_n{sampling_str}_usegene{integrate_gene_str}{m_names_end}KLD4"#5"
                         input_data.append([nn_name, integrate_gene, 6, True, animal, noise_path, animal_no_noise,
                                            '(' + str(sampling) + ',' + str(cov) + ')', num_target])
-        for linkage_def_idx in [3]:#2,3,0,1
+        for linkage_def_idx in [1,3]:#2,3,0,1
             print(linkage_def_idx)
             model_rows, afc_rows, linkage_rows = [], [], []
-            model_rows,afc_rows,linkage_rows=linkage_correlation_filter(model_rows, afc_rows, linkage_rows,input_data,linkage_def_idx,num_neigbors=50,
+            model_rows,afc_rows,linkage_rows=linkage_correlation_filter(model_rows, afc_rows, linkage_rows,input_data,linkage_def_idx,num_neighbors=50,
                                 plot_path=plot_path+str(linkage_def_idx),
                                        num_submodels=num_submodels,chrom=chrom,debugg=debugg,use_abs=use_abs,
                                        tmp_data_folder=tmp_data_folder,afc_gen=5,num_train_gens=6,work_from=work_from,time_series_LD=time_series_LD) # for paper we had afc_gen=5?

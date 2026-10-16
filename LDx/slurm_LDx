@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -t 05:00:00  # 6 hours
-#SBATCH -A m2_datamining
-#SBATCH -p longtime
+#SBATCH -A account
+#SBATCH -p partition
 #SBATCH --mem=35000  # 72GB memory
 #SBATCH -J simulation
 #SBATCH --mail-type=None
@@ -84,9 +84,9 @@ bcftools index "$sim_vcf"
 bcftools filter -e 'QUAL<20 || DP<10' "$sim_vcf" -Oz -o "$sim_vcf_filter"
 bcftools index "$sim_vcf_filter"
 
+perl ./LDx.pl -l 1 -h 10000 -q 1 -a 0.00001 -i 1 -s 1000 "$sim_sam" "$sim_vcf_filter" > "$ldx_result"
 
-#perl ./LDx.pl -l 1 -h 10000 -q 1 -a 0 -i 1 -s 1000 "$sim_sam" "$sim_vcf_filter" > "$ldx_result"
-perl ./LDx.pl "$sim_sam" "$sim_vcf_filter" > "$ldx_result"
+
 
 
 

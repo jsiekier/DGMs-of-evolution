@@ -93,6 +93,8 @@ python plot_scripts/main_data_analysis_exp_II.py
 ```bash
 python plot_scripts/plot_tmp_main_synthetic.py
 python plot_scripts/plot_linkage_correlations.py
+
+python plot_scripts/LD_filtering_results.py
 ```
 
 ### 2. Experiments on empirical dataset:
@@ -165,6 +167,7 @@ python plot_scripts/main_experimental_data_analysis.py
 ```bash
 python plot_scripts/plot_tmp_experimental.py
 python plot_scripts/plot_linkage_correlations.py
+python plot_scripts/LD_filtering_results.py
 ```
 ## Contact
 

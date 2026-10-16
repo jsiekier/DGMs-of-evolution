@@ -6,7 +6,7 @@ from linkage.LD_calculator import calculate_LD_on_subset_chrom
 from data_processing.file_reader import read_estimated_s_positions, read_targets_acc_to_afc
 
 
-def read_all_data(animal,chromosomes, work_from='work_lap',ld_idx=1):
+def read_all_data(animal,chromosomes, work_from='work_lap',ld_idx=3):
     AFC = dict()
     estimated_s = dict()
     Nes = dict()
